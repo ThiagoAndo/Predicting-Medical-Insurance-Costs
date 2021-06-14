@@ -1,0 +1,666 @@
+---
+title: "The Challenges of Predicting Health Care Costing"
+author: "Thiago Ando de Freitas"
+date: " Last edited `r format(Sys.Date(), '%d %B, %Y')`"
+output: 
+ html_document:
+    css: "style.css" 
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+      toc_depth: 1
+      
+   # toc_depth: 2
+   # number_sections: true
+---
+
+
+
+```{r setup, include = FALSE}
+# This will setup parameters for all chunks on the script
+# knitr::opts_chunk$set(fig.align = 'center', out.width = '80%',, echo = TRUE)
+
+knitr::opts_chunk$set(fig.align = 'center', echo = TRUE)
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+# Loading Packages 
+
+library(tidyverse)  # data manipulation
+
+library(ggplot2)    # visualization
+
+library(readr)      # data manipulation
+
+library(caret)      # Machine Learning
+
+library(mgcv)       # Machine Learning
+
+
+
+files <- dir("data", full = T)
+
+
+if(length(files)==0 ){
+warning("FIRST YOU MUST CREATE A NEW R PROJEC THEN COPY THE FILES DOWNLOADED FROM GIT HUB AND PAST ALL INTO THE NEW PROJECT FOLDER") }
+
+medical_data <- read_csv(files, col_types = "nnfnnffn") 
+
+medical_data <- medical_data %>%
+     mutate(charges = exp(logcharges))%>% 
+     select(- logcharges)
+```
+
+
+
+
+<center>
+![cost-of-health](images/cost-of-health-coverage1.jpg)
+</center>
+
+
+#Introduction
+
+When it comes to worries about high health care costs, having health insurance doesn't necessarily spare you, according to a study recently published in JAMA.
+
+Despite the gains in insurance coverage brought by the Affordable Care Act, high health care costs continue to plague many Americans, researchers found. Around 11 million Americans experienced "catastrophic medical expenses" in 2017, the last year the study covered and privately insured people represented more than half of those.
+
+The objective of this analysis is to forecast insurance costs based on people's data with 
+machine learning models such as Linear Regression and Tree-Based Models. 
+
+
+[You can read more about the challenges of health care costing in this article](https://www.npr.org/sections/health-shots/2020/11/12/934146128/despite-aca-coverage-gains-millions-still-suffer-catastrophic-health-care-costs). 
+
+
+
+--------------------------------------------------------------------------------------------
+
+#The Data
+
+The Medical Cost Personal Dataset has been taken from [Kaggle.](https://www.kaggle.com/mirichoi0218/insurance) This data contains `r ncol(medical_data)` attributes. It has a total number of `r nrow(medical_data)` rows. 
+
+### Attributes:
+
+* age: age of primary beneficiary
+
+* sex: insurance contractor gender, female, male
+
+* bmi: Body mass index, providing an understanding of body, weights that are relatively high   or low relative to height,
+  objective index of body weight (kg / m ^ 2) using the ratio of height to weight, ideally     18.5 to 24.9
+
+* children: Number of children covered by health insurance / Number of dependents
+
+* smoker: Smoking
+
+* region: the beneficiary's residential area in the US, northeast, southeast, southwest,  northwest.
+
+* charges: Individual medical costs billed by health insurance
+
+</br>
+
+
+--------------------------------------------------------------------------------------------
+
+
+# Data cleaning and pre-processing
+
+There were no duplicate entries in the dataset and no missing values the functions below gives a summary of these:
+```{r}
+paste0("There are ",sum(duplicated(medical_data)), " duplicated observations") 
+```
+
+</br>
+```{r, warning=FALSE}
+#Checking for missing values 
+visdat::vis_miss(medical_data)
+
+```
+</br>
+
+--------------------------------------------------------------------------------------------
+
+</br></br>
+
+# Objective
+Performing analysis of Medical Cost Personal Dataset both visually and statistically to obtain important observations that can be used for inference. Build a model having high accuracy and precision to predict the cost of health insurance with greater confidence.
+
+
+</br></br>
+
+
+--------------------------------------------------------------------------------------------
+
+
+#Data Analysis
+
+
+</br>
+
+```{r}
+# The skim  providing a strong set of summary statistics that are generated for a variety of different data types.
+skimr::skim(medical_data)
+```
+
+
+</br>
+```{r, warning=FALSE}
+
+summary(medical_data)
+
+```
+</br>
+
+
+
+```{r, warning=FALSE,fig.cap = 'Figure 1.0' }
+
+ggplot(medical_data, aes(region))+
+ geom_bar()+
+   geom_text(aes(label = ..count..), stat = "count", vjust = -.3, colour = "black",
+             fontface = "bold", size = 4) +
+   xlab("Regions") +
+   ylab("Count") +
+   ggtitle("Count of Regions")+
+   theme_minimal()+
+   theme(
+      axis.text.y = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(size = 17),
+      axis.text.x = element_text(size=10, face="bold", colour = "black"),
+      legend.position = "none")
+```
+Figure 1.0 shows that the number of records in the dataset is approximately equally distributed among the regions.
+
+</br>
+```{r, fig.cap = 'Figure 2.0'}
+
+ggplot(medical_data, aes(children))+
+ geom_bar()+
+   geom_text(aes(label = ..count..), stat = "count", vjust = -.3, colour = "black",
+             fontface = "bold", size = 4) +
+   xlab("Number of Children") +
+   ylab("Count") +
+   ggtitle("Count of the Incidences of the Number of Children")+
+   theme_minimal()+
+   theme(
+      axis.text.y = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(size = 17),
+      axis.text.x = element_text(size=10, face="bold", colour = "black"),
+      legend.position = "none")
+
+```
+
+In Figure 2.0 we can verify that the incidence of 4 and 5 children covered by health insurance is very low, probably because it makes the value of the insurance more expensive.
+
+You can understand better how the insurance companies charge their clients for the number of dependents by clicking [here.](https://www.bcbsm.com/index/health-insurance-help/faqs/topics/buying-insurance/family-size-impact-cost.html)
+
+</br>
+
+
+
+
+```{r, warning=FALSE,fig.cap = 'Figure 3.0'}
+ggplot(medical_data, aes(y = charges, x = as.factor(children)))+
+  geom_violin()+ 
+  geom_boxplot(width=0.1)+
+  scale_y_continuous(labels=scales::dollar_format())+
+       theme_minimal()+
+       xlab("Number of children covered by health insurance") +
+       ylab("Charges") +
+       ggtitle("Distribution of Charges Among the Numbers of children covered")+
+       theme(
+          plot.title = element_text(size = 15),
+          axis.text.x=element_text(size = 12, color="black"),
+          strip.text.x = element_text(size = 14))
+```
+
+Figure 3.0 shows a counterintuitive behavior of the charges made by the insurance companies, for it gets lower as the number of dependents gets higher.
+</br>
+
+```{r, warning=FALSE, fig.cap = 'Figure 4.0'}
+
+ggplot(medical_data, aes(charges))+
+   geom_density()+
+   facet_grid()+
+   xlab("Charges") +
+   ylab("Density") +
+   ggtitle("Distribution of Charges")+
+   scale_x_continuous(labels=scales::dollar_format())+
+   theme_minimal()+
+   theme(
+         plot.title = element_text(size = 15))
+
+```
+Figure 4.0 shows the distribution of charges is right-skewed with a long tail to the right. There's a bump at around $40,000
+</br>
+
+```{r, warning=FALSE,fig.cap = 'Figure 5.0'}
+
+ggplot(medical_data, aes(bmi, fill = sex))+
+   geom_density(alpha = .5)+
+   scale_fill_manual(name="Gender",values=c("#EC2C73","#FFDD30"))+
+   facet_grid()+
+   xlab("Charges") +
+   ylab("Density") +
+   ggtitle("Distribution of Body Mass Index ")+
+   theme_minimal()+
+   theme(
+         plot.title = element_text(size = 15))
+
+```
+Figure 5.0 shows that the medical charges is slightly higher for men than they are for women .
+</br>
+
+```{r, warning=FALSE,fig.cap = 'Figure 6.0'}
+
+ggplot(medical_data, aes(y = charges, x = region, color = region))+
+  geom_violin(trim=TRUE)+ 
+   geom_boxplot(width=0.1)+
+   facet_grid(cols = vars(smoker),labeller = label_both)+
+   scale_y_continuous(labels=scales::dollar_format())+
+   theme_minimal()+
+   xlab("Region") +
+   ylab("Charges") +
+   ggtitle("Distribution of Charges Among Regions and Smoking Status")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14),
+      legend.position = "none")
+
+```
+In Figure 6.0 it is possible to verify that smokers are charged more than nonsmokers and the values for smokers condition are more spread than no smokers among the regions.
+</br>
+
+
+```{r, warning=FALSE,fig.cap = 'Figure 7.0'}
+ggplot(medical_data , aes(x = smoker, y = charges, color = age))+
+   geom_point(alpha = .5, size  = 4.5)+
+   scale_color_viridis_c(option = "plasma")+
+   geom_boxplot(alpha = .3)+
+   scale_y_continuous(labels=scales::dollar_format())+
+   theme_dark()+
+   xlab("Smoker") +
+   ylab("Charges") +
+   ggtitle("Distribution of Charges Between Smoking Status and Age")+
+   theme(
+      plot.title = element_text(size = 15),
+      axis.text.x=element_text(size = 12, color="black"),
+      strip.text.x = element_text(size = 14))
+```
+
+```{r, message= FALSE, fig.cap = 'Figure 7.1'}
+ggplot(medical_data, aes(x = age, y = charges, color = smoker))+
+geom_point(alpha=.4,size=4)+  
+facet_grid(cols = vars(smoker),labeller = label_both)+
+scale_color_manual(name="Gender",values=c("#EC2C73","#FFDD30"))+
+   geom_smooth(method = "lm",se = FALSE, color = "Black")+
+   theme_minimal()+
+   xlab("Age") +
+   ylab("Charges") +
+   ggtitle("Distribution of Charges Among Regions and Smoking Status")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14),
+      legend.position = "none")
+
+```
+Figures 7.0 and 7.1 shows that smokers and age have the highest impact on medical charges. We can also see in 7.1 that the variables `age` and `charges` are positively correlated. However, it does not seem to have a linear correlation between the variables. Also, there appear to exist another group of customers (higher charged nonsmokers and smokers).
+
+
+
+
+
+```{r, message= FALSE, fig.cap = 'Figure 8.0'}
+ggplot(medical_data, aes(x = bmi, y = charges, color = smoker))+
+   geom_point(alpha=4/5,size=4)+
+   scale_y_continuous(labels = scales::dollar) +
+   geom_smooth(method = "lm",se = F)+
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Body mass index") +
+   ylab("Charges") +
+   ggtitle("Body mass index vs Charges")+
+   theme(
+      plot.title = element_text(size = 15),
+      axis.text.x=element_text(size = 12, color="black"),
+      strip.text.x = element_text(size = 14))
+
+```
+In Figure 8.0 is possible to see that body mass index and medical charges are weak, positive, and linearly correlated for nonsmokers. And strong, positive, and linearly correlated for smokers. 
+Also, it is possible
+to verify the appearance again of the mysterious group of customers in this plot (the strong, positive, and linear nonsmokers) that follows the correlation of smokers. I tried to run an unsupervised machine learning (K-means clustering algorithm) to discover what features would be responsible for this unknown group with no success. The variables that would explain these groups from Figures 7.1 and 8.0 do not exist in the dataset. Therefore these higher medical charges for nonsmokers and smokers appear to be attributed to randomness.
+</br>
+</br>
+ 
+ 
+# Machine Learning
+
+Algorithm                        | Description
+---------------------------------|-------------
+Generalized additive Model (GAM) | Generalized linear model   
+Random Forest                    | Decision tree 
+
+</br>
+
+
+
+##Evaluation Metrics 
+
+### RMSE
+
+RMSE is the square root of the variance of the residuals. It indicates the absolute fit of the model to the data-how close the observed data points are to the model's predicted values. </br> 
+
+### R-squared
+
+R-squared (R2) is a statistical measure that represents the proportion of the variance for a dependent variable that's explained by an independent variable or variables in a regression model.
+ 
+</br> 
+ 
+ 
+#Applying algorithms
+
+###Splitting Data
+
+Before we can train machine learning models and make predictions, we need to split the data into the train-set and test-set
+
+
+
+```{r, warning=FALSE}
+# Create partition index
+set.seed(341)
+
+index <- createDataPartition(medical_data$charges, p = 0.75, list = FALSE)
+
+train_full <- medical_data[index, ]
+
+
+test_full  <- medical_data[-index, ]
+```
+
+
+Although the variable `region` and  `sex` have just a weak influence over the variable `charges`, I decided to keep it to trein the model for it made the model a bit more precise in its predictions. I also choose the Generalized additive Model (GAM) to detect the nonlinear relationships among the variables automatically.
+</br> 
+
+###Generalized additive Model
+
+```{r, warning=FALSE}
+
+set.seed(341)
+model_normal_g <- train(
+   log(charges) ~ age + sex + bmi + children+ smoker + region, 
+   train_full,
+   method = "gam",
+   trControl = trainControl(
+      method = "cv", 
+      number = 5,
+      verboseIter = FALSE
+   )
+)
+model_normal_g$results[2,c(3,4)]
+
+```
+The Results are no bad. The model was able to explain almost 74% of the variance in the response variable.
+
+
+
+
+```{r}
+set.seed(341)
+test_full <- test_full %>%
+   mutate( pred_full = predict(model_normal_g,test_full),
+           pred_full = exp(pred_full)) 
+```
+
+
+
+```{r,message= FALSE, fig.cap = 'Figure 9.0'}
+
+ggplot(test_full, aes(x = charges, y = pred_full, color = smoker ))+
+   geom_point(alpha=.7,size=4)+
+   geom_abline(color = "blue")+
+   scale_y_continuous(labels = scales::dollar) +
+   scale_x_continuous(labels = scales::dollar) +
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Actual Charges") +
+   ylab("Predicted Charges") +
+   labs(title = "Predicted Charges vs Actual Charges",
+        subtitle = "Whole Data Model Predictions")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14))
+
+```
+
+Figure 9.0, The GAM model trained with the full-train dataset performed well in predicting the low charges. Therefore I decided to train another model only with high values ofv charges, and combine the predictions of both models to see if I can get a better RMSE and R-squared.
+</br>
+
+
+```{r, warning=FALSE}
+
+train_full_smokers <- train_full %>%
+              filter(smoker == "yes")
+
+set.seed(341)
+model_smoker_g <- train(
+   log(charges) ~ age + sex + bmi + children+ smoker + region, 
+   train_full_smokers,
+   method = "gam",
+   trControl = trainControl(
+      method = "cv", 
+      number = 5,
+      verboseIter = FALSE
+   )
+)
+
+
+model_smoker_g$results[2,c(3,4)]
+```
+
+Here we can see that indeed the model trained with only high charges values delivered a better result. Now let's combine then into the `test_full` dataset and see the final result.
+
+
+```{r}
+set.seed(341)
+
+test_full <- test_full %>%
+   mutate( pred_sep = ifelse(smoker == "yes", 
+                             predict(model_smoker_g,test_full), NA),
+           pred_sep = exp(pred_sep))
+
+test_full <- test_full %>%
+   mutate( pred_sep = ifelse(smoker == "yes",pred_sep, pred_full))
+
+
+postResample(pred = test_full$pred_sep, 
+             obs = test_full$charges)
+
+```
+In fact, by using a combination of both models, we ended up with an R squared almost 10% better than the first model. Now we'll visualize the results of joining the predictions of these models together.
+
+
+
+
+
+```{r,message= FALSE, fig.cap = 'Figure 10'}
+
+test_full %>%
+   filter(smoker == "no")%>%
+ggplot( aes(x = charges, y = pred_full ))+
+      geom_point(alpha=.7,size=4)+
+   geom_abline(color = "blue")+
+   scale_y_continuous(labels = scales::dollar)+
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Actual Charges") +
+   ylab("Predicted Charges") +
+   labs(title = "Predicted Charges vs Actual Charges For no Smokers",
+        subtitle = "Whole Data Model Predictions")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14))+
+   scale_x_continuous(breaks=seq(0,40000, by=5000),labels = scales::dollar)+
+   coord_cartesian(ylim = c(0, 20000))
+   
+```
+Figure 10, is a zoom into the nonsmoker's charges prediction made by the first model (`model_normal_g`), as we can see, it did not perform badly.
+</br> 
+
+
+```{r,message= FALSE, fig.cap = 'Figure 11'}
+test_full %>%
+   filter(smoker == "yes")%>%
+ggplot(aes(x = charges, y = pred_full ))+
+      geom_point(alpha=.7,size=4)+
+   scale_y_continuous(labels = scales::dollar)+
+   scale_x_continuous(labels = scales::dollar)+
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Actual Charges") +
+   ylab("Predicted Charges") +
+   labs(title = "Predicted Charges vs Actual Charges For Smokers",
+              subtitle = "Whole Data Model")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14))+
+      geom_abline(color = "blue")
+```
+Figure 11, is a zoom into the smoker's charges prediction made by the first model (`model_normal_g`), as we can see, it did not perform well.
+</br> 
+
+
+
+
+```{r,message= FALSE, fig.cap = 'Figure 12'}
+test_full %>%
+   filter(smoker == "yes")%>%
+ggplot(aes(x = charges, y = pred_sep ))+
+      geom_point(alpha=.7,size=4)+
+   scale_y_continuous(labels = scales::dollar)+
+   scale_x_continuous(labels = scales::dollar)+
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Actual Charges") +
+   ylab("Predicted Charges") +
+   labs(title = "Predicted Charges vs Actual Charges For Smokers",
+              subtitle = "Smoker Data Model")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14))+
+      geom_abline(color = "blue")
+```
+Figure 12 is the result of the model trained only with higher charge values. As we can see, it performed better with high values than the first model trained with the full-train dataset.
+
+
+
+
+
+```{r, message= FALSE, fig.cap = 'Figure 13'}
+
+ggplot(test_full, aes(x = charges, y = pred_sep, color = smoker ))+
+   geom_point(alpha=.7,size=4)+
+   geom_abline(color = "blue")+
+   scale_y_continuous(labels = scales::dollar) +
+   scale_x_continuous(labels = scales::dollar) +
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Actual Charges") +
+   ylab("Predicted Charges") +
+   labs(title = "Predicted Charges vs Actual Charges For Smokers",
+        subtitle = "Mixed Predictions")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14))
+```
+Figure 12 is the result of the combination of the predictions made by both models. As we can see, the predicted values for smokers are much closer to the actual ones when compared with Figure 9.0.
+</br></br>
+
+
+
+###Random Forest
+
+```{r, message= FALSE}
+
+set.seed(341)
+# Fit random forest: model
+model_ranger <- train(
+   charges ~ age + sex + bmi + children+ smoker + region,
+   tuneLength = 3,
+   data = train_full, 
+   method = "ranger",
+   trControl = trainControl(
+      method = "cv", 
+      number = 5, 
+      verboseIter = FALSE
+   )
+)
+model_ranger$results[which.min(model_ranger$results$RMSE),c("RMSE","Rsquared")]
+```
+
+With the standard deviation of the residuals (RMSE) being about $4,937,41 and a variance of 82% explained by the independent variables the Random Forest performed very well. Let's check how the model performs in a new dataset.
+
+
+
+```{r}
+
+set.seed(341)
+test_full <- test_full %>%
+   mutate( pred_full = predict(model_ranger,test_full)) 
+
+
+postResample(pred = test_full$pred_full, 
+             obs = test_full$charges)
+
+```
+
+Well, it performed a little bit better in the test dataset, but the results were quite similar. This was expected because the model was trained using the cross-validation method. Therefore, the model is trained and tested in different parts of the data.
+
+
+```{r, message= FALSE, fig.cap = 'Figure 14'}
+
+ggplot(test_full, aes(x = charges, y = pred_full, color = smoker ))+
+   geom_point(alpha=.7,size=4)+
+   geom_abline(color = "blue")+
+   scale_y_continuous(labels = scales::dollar) +
+   scale_x_continuous(labels = scales::dollar) +
+   scale_color_manual(name="Smoker",values=c("#EC2C73","#FFDD30"))+
+   theme_minimal()+
+   xlab("Actual Charges") +
+   ylab("Predicted Charges") +
+   labs(title = "Predicted Charges vs Actual Charges",
+        subtitle = "Whole Data Model Predictions")+
+   theme(
+      plot.title = element_text(size = 15),
+      strip.text.x = element_text(size = 14))
+```
+
+Figure 14 is the plot of `Actual Charges` vs `Predicted Charges` for predictions made with the random forest model. As we can check, Figure 14 is very similar to Figure 12.  
+
+
+
+
+#Conclusion
+
+ The random forest algorithm performed better than the GAM algorithm rance its capability of understanding the type of correlation and interaction among the variables. And it saved the trouble of trying to improve the model as it was necessary with the GAM algorithm. 
+ 
+I tried to find another dataset that could explain those groups of customers that appeared in figures 7.1 and 8.0 with no success. For now, it is very secure to say that smoking raises the price of health care insurance.  
+ 
+
+
+
+You can find the code used in this article in the [Github Repository](https://github.com/ThiagoAndo/Predicting-Medical-Insurance-Costs). **Right-click on the link and choose (open in a New Window).**
+
+
+
+
+
+
