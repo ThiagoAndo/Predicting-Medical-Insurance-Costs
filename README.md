@@ -29,6 +29,16 @@ machine learning models such as Linear Regression and Tree-Based Models.
 </br>
 
 
+ 
+# Machine Learning
+
+Algorithm                       | Description
+---------------------------------|-------------
+Generalized additive Model (GAM) | Generalized linear model   
+Random Forest                    | Decision tree 
+
+</br>
+
 
 
 You can find the detailed article in markdown format in the [RPubs](https://rpubs.com/AndoFreitas)
