@@ -1,20 +1,14 @@
----
-output: 
- html_document:
-    css: "style.css" 
----
-    
-    
+
 Predicting-Medical-Insurance-Costs
 =========================
 
 
 
-![](images/cost-of-health-coverage1.jpg)
+![](https://github.com/ThiagoAndo/Predicting-Medical-Insurance-Costs/commit/8a57426b09b5dc4f962f35f5fd9a118387c0901e?short_path=0103c96#diff-0103c960fd7fc7c26cd3b69ea0dde2ec82355c8280819d9b34987d39cfb617e7/cost-of-health-coverage1.jpg)
 
 
 
-#Introduction
+# Introduction
 
 When it comes to worries about high health care costs, having health insurance doesn't necessarily spare you, according to a study recently published in JAMA.
 
