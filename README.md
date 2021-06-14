@@ -4,7 +4,7 @@ Predicting-Medical-Insurance-Costs
 
 
 
-![](https://github.com/ThiagoAndo/Predicting-Medical-Insurance-Costs/commit/8a57426b09b5dc4f962f35f5fd9a118387c0901e?short_path=0103c96#diff-0103c960fd7fc7c26cd3b69ea0dde2ec82355c8280819d9b34987d39cfb617e7/cost-of-health-coverage1.jpg)
+![](images/cost-of-health-coverage1.jpg)
 
 
 
